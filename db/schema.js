@@ -2,7 +2,7 @@ import { is } from "drizzle-orm";
 import { check } from "drizzle-orm/gel-core";
 import {pgTable,serial, text, boolean, timestamp, integer, PgRole} from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
+export const usersAbsensi = pgTable("users_absensi", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
