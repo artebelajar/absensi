@@ -13,7 +13,7 @@ export const usersAbsensi = pgTable("users_absensi", {
 
 export const attendances = pgTable("attendances", {
     id: serial("id").primaryKey(),
-    user_id: integer("user_id").notNull().references(() => users.id),
+    user_id: integer("user_id").notNull().references(() => usersAbsensi.id),
     check_in: timestamp("check_in").defaultNow(),
     check_out: timestamp("check_out"),
     note: text("note"),
