@@ -15,7 +15,9 @@
     "uuid": "^14.0.0"
   },
   "scripts": {
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:generate":"drizzle-kit generate",
+    "db:migrate":"drizzle-kit migrate"
   },
   "keywords": [],
   "author": "",

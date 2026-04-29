@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Absensi</title>
+  </head>
+  <body>
+    <h2>Absensi</h2>
+
+    <input type="text" id="identifier" placeholder="ID atau email" /><br /><br />
+
+    <button onclick="checkIn()">Check In</button>
+    <button onclick="checkOut()">Check Out</button>
+
+    <p id="result"></p>
+
+    <script>
+  async function checkIn() {
+    const identifier = document.getElementById("identifier").value;
+    console.log(identifier);
+
+    const res = await fetch("/user/check-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier }),
+    });
+
+    const result = await res.json();
+    document.getElementById("result").innerText = result.message;
+  }
+
+  async function checkOut() {
+    const identifier = document.getElementById("identifier").value;
+
+    const res = await fetch("/user/check-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier }),
+    });
+
+    const result = await res.json();
+    console.log(result);
+    document.getElementById("result").innerText = result.message;
+  }
+</script>
+  </body>
+</html>

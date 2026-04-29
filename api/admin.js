@@ -10,7 +10,18 @@ const admin = new Hono();
 
 admin.use("*", authMiddleware, adminOnly);
 
-admin.get("/dashboard", (c) => c.text("selamat datang admin"));
+admin.get("/dashboard", (c) => c.json({message: "selamat datang admin"}));
+
+admin.get("/users", async (c) => {
+  const data = await db.select({
+    id: usersAbsensi.id,
+    name: usersAbsensi.name,
+    email: usersAbsensi.email,
+    role: usersAbsensi.role,
+    is_active: usersAbsensi.is_active,
+  }).from(usersAbsensi).orderBy(usersAbsensi.name);
+  return c.json({ data });
+});
 
 admin.post("/users", async (c) => {
   const body = await c.req.json();
@@ -20,16 +31,24 @@ admin.post("/users", async (c) => {
     return c.json({ error: "Semua field wajib diisi" }, 400);
   }
 
+  if (!["admin", "user"]) {
+    return c.json({ error: "role harus admin atau user" }, 400);
+  }
+
+  if (password.length < 6) {
+    return c.json({ error: "password minimal 6 karakter" }, 400);
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
 
   try {
-    await db.insert(usersAbsensi).values({
+    const [created] = await db.insert(usersAbsensi).values({
       name,
       email,
       password: hashedPassword,
       role: "user",
       is_active: true,
-    });
+    }).returning({id: usersAbsensi.id, name: usersAbsensi.name, email: usersAbsensi.email});
 
     return c.json({ message: "User berhasil ditambahkan", user }, 201);
   } catch (error) {
@@ -57,11 +76,11 @@ admin.patch("/users/:id/status", async (c) => {
 admin.get("/attendances", async (c) => {
   const month = c.req.query("month");
 
-  if (!month) {
-    return c.json({ error: "bulan wajib diisi (yyyy-mm)" }, 400);
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return c.json({ error: "parameter month wajib di isi" }, 400);
   }
 
-  const start = new Date(`${month}-01`);
+  const start = new Date(`${month}-01T00:00:00.000Z`);
   const end = new Date(start);
   end.setMonth(end.getMonth() + 1);
 
@@ -69,12 +88,16 @@ admin.get("/attendances", async (c) => {
     .select({
       id: attendances.id,
       user_id: attendances.user_id,
+      name: usersAbsensi.name,
+      email: usersAbsensi.email,
       check_in: attendances.check_in,
       check_out: attendances.check_out,
       note: attendances.note,
     })
     .from(attendances)
-    .where(and(gte(attendances.check_in, start), lte(attendances.check_out, end)));
+    .leftJoin(usersAbsensi, eq(attendances.user_id, usersAbsensi.id))
+    .where(and(gte(attendances.check_in, start), lte(attendances.check_out, end)))
+    .orderBy(attendances.check_in);
 
   return c.json({ data });
 });

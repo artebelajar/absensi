@@ -1,12 +1,23 @@
-import { sessions } from "../api/auth.js"
+import { getCookie } from "hono/cookie";
+import { verifyToken } from "../lib/jwt.js";
 
 export const authMiddleware = async (c, next) => {
-    const token = c.req.headers("Authorization");
-    const user = sessions.get(token);
+  const token = getCookie(c, "token");
 
-    if (!user) {
-        return c.json({ error: "Unauthorized" }, 401);
-    }
-    c.set("user", user);
+  if (!token) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const user = await verifyToken(token);
+  try {
+    c.set("user", {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
     await next();
+  } catch (error) {
+    console.error("jwt verify error:", error);
+    return c.json({ error: "invalid token" }, 401);
+  }
 };
