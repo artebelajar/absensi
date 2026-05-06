@@ -1,5 +1,3 @@
-import { is } from "drizzle-orm";
-import { check } from "drizzle-orm/gel-core";
 import {pgTable,serial, text, boolean, timestamp, integer, PgRole} from "drizzle-orm/pg-core";
 
 export const usersAbsensi = pgTable("users_absensi", {

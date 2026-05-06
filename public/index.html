@@ -41,8 +41,14 @@
 
     const result = await res.json();
     console.log(result);
-    document.getElementById("result").innerText = result.message;
+    document.getElementById("result").innerText = result.message || result.error;
+    ;
   }
+
+      (async () => {
+        const res = await fetch("/auth/me", { credentials: "include" });
+        if (!res.ok) return (window.location.href = "/login.html");
+      })();
 </script>
   </body>
 </html>

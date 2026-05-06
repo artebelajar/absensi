@@ -89,12 +89,13 @@ user.post("/check-out", async (c) => {
   }
 
   const now = new Date();
-
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
+  const wibTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+  
+  const startOfDay = new Date(wibTime);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date(wibTime);
+  endOfDay.setHours(23, 59, 59, 999);
 
   const existing = await db
     .select()
@@ -102,19 +103,32 @@ user.post("/check-out", async (c) => {
     .where(
       and(
         eq(attendances.user_id, user.id),
-        gte(attendances.check_in, start),
-        lte(attendances.check_out, end),
+        gte(attendances.check_in, startOfDay),
+        lte(attendances.check_in, endOfDay),
+        isNull(attendances.check_out) 
       ),
     );
 
   const attendance = existing[0];
 
   if (!attendance) {
-    return c.json({ error: "belum check-in" }, 400);
-  }
-
-  if (attendance.check_out) {
-    return c.json({ error: "sudah check-out" }, 400);
+    const anyAttendanceToday = await db
+      .select()
+      .from(attendances)
+      .where(
+        and(
+          eq(attendances.user_id, user.id),
+          gte(attendances.check_in, startOfDay),
+          lte(attendances.check_in, endOfDay)
+        )
+      );
+    
+    console.log("Any attendance today (including checked-out):", anyAttendanceToday);
+    
+    return c.json({ 
+      message: "belum check-in hari ini",
+      debug: anyAttendanceToday.length > 0 ? "Sudah check-out sebelumnya" : "Tidak ada record"
+    }, 400);
   }
 
   await db
@@ -122,7 +136,7 @@ user.post("/check-out", async (c) => {
     .set({ check_out: now })
     .where(eq(attendances.id, attendance.id));
 
-  return c.json({ message: `Check-out berhasil (${user.name}))` });
+  return c.json({ message: `Check-out berhasil (${user.name})` });
 });
 
 export default user;
