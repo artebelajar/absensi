@@ -1,10 +1,13 @@
 import { Hono } from "hono";
+import { cors } from 'hono/cors';
 
 import {auth} from "./auth.js";
 import admin from "./admin.js";
 import user from "./user.js";
 
 const app = new Hono();
+
+app.use('/*', cors());
 
 app.route("/auth", auth)
 app.route("/admin", admin)

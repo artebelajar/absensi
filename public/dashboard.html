@@ -68,7 +68,6 @@
                 <th>Email</th>
                 <th>Check In</th>
                 <th>Check Out</th>
-                <th>Note</th>
             </tr>
         </thead>
         <tbody id="absensiTableBody">
@@ -77,8 +76,14 @@
             </tr>
         </tbody>
     </table>
+    <button class="btn-excel" onclick="downloadExcel()">
+        📥 Download Excel
+    </button>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
     <script>
+        let allUsers = []; 
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -96,8 +101,9 @@ await loadAbsensi();
 
 async function loadUsers() {
     const res = await fetch("/admin/users", {credentials: "include"});
-if(!res.status === 401 || !res.status === 403) {window.location.href = "/login.html"; return; }
+if(res.status === 401 || res.status === 403) {window.location.href = "/login.html"; return; }
 const {data} = await res.json();
+allUsers = data;
 const tbody = document.getElementById("userTableBody");
 if(!data || !data.length === 0){
     tbody.innerHTML = `<tr><td colspan="4">Tidak ada data</td></tr>`;
@@ -139,6 +145,58 @@ await loadUsers();
 }
 }
 
+async function downloadExcel() {
+            if (allUsers.length === 0) {
+                showToast('Tidak ada data untuk diekspor', 'warning');
+                return;
+            }
+            
+            try {
+                // Langsung download dari backend
+                const response = await fetch(`admin/export/excel`);
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `users_${Date.now()}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                showToast(`✅ Download Excel berhasil (${allUsers.length} data)`, 'success');
+            } catch (error) {
+                // Fallback: Export client-side jika backend error
+                exportToExcelClientSide(allUsers, 'all_users');
+            }
+        }
+        
+
+        function exportToExcelClientSide(data, filename) {
+            const excelData = data.map(user => ({
+                'ID': user.id,
+                'Nama': user.name,
+                'Email': user.email,
+                'Role': user.role,
+                'Status': user.is_active ? 'Aktif' : 'Tidak Aktif',
+                'Tanggal Dibuat': user.created_at ? new Date(user.created_at).toLocaleDateString('id-ID') : '-'
+            }));
+            
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Database Users');
+            
+            const maxWidth = Object.keys(excelData[0]).reduce((width, key) => {
+                const colWidth = Math.max(key.length, ...excelData.map(row => String(row[key]).length));
+                return { ...width, [key]: colWidth };
+            }, {});
+            worksheet['!cols'] = Object.values(maxWidth).map(w => ({ wch: Math.min(w + 2, 50) }));
+            
+            XLSX.writeFile(workbook, `${filename}_${Date.now()}.xlsx`);
+        }
+        
 
 async function loadAbsensi() {
     const month = document.getElementById("filterMonth").value;
@@ -170,7 +228,6 @@ async function loadAbsensi() {
             <td>${a.email ?? "-"}</td>
             <td>${formatTanggal(a.check_in)}</td>
             <td>${a.check_out ? formatTanggal(a.check_out) : "-"}</td>
-            <td>${a.note ?? "-"}</td>
         </tr>
     `).join("");
 }
@@ -187,6 +244,16 @@ function formatTanggal(iso){
        });
            window.location.href = "/login.html";
    }
+
+   function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
     </script>
 </body>
 </html>

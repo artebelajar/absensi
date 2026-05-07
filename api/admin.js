@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { usersAbsensi, attendances } from "../db/schema.js";
 import { eq, and, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import ExcelJS from 'exceljs';
 
 const admin = new Hono();
 
@@ -19,7 +20,7 @@ admin.get("/users", async (c) => {
     email: usersAbsensi.email,
     role: usersAbsensi.role,
     is_active: usersAbsensi.is_active,
-  }).from(usersAbsensi).orderBy(usersAbsensi.name);
+  }).from(usersAbsensi);
   return c.json({ data });
 });
 
@@ -100,6 +101,52 @@ admin.get("/attendances", async (c) => {
     .orderBy(attendances.check_in);
 
   return c.json({ data });
+});
+
+admin.get('/export/excel', async (c) => {
+  try {
+    const data = await db.select().from(usersAbsensi);
+    
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Data Users');
+    
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Nama', key: 'name', width: 25 },
+      { header: 'Email', key: 'email', width: 35 },
+      { header: 'Role', key: 'role', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Tanggal Dibuat', key: 'created_at', width: 20 },
+    ];
+    
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4F46E5' }
+    };
+    
+    data.forEach(user => {
+      worksheet.addRow({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.is_active ? 'Aktif' : 'Tidak Aktif',
+        created_at: user.created_at?.toLocaleDateString('id-ID')
+      });
+    });
+    
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    c.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    c.header('Content-Disposition', `attachment; filename="users_${Date.now()}.xlsx"`);
+    
+    return c.body(buffer);
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: 'Gagal export Excel' }, 500);
+  }
 });
 
 export default admin;
