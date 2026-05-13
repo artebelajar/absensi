@@ -103,50 +103,115 @@ admin.get("/attendances", async (c) => {
   return c.json({ data });
 });
 
-admin.get('/export/excel', async (c) => {
+// Tambahkan endpoint ini di admin.js
+admin.get('/export/absensi-excel', async (c) => {
   try {
-    const data = await db.select().from(usersAbsensi);
+    const month = c.req.query("month");
     
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return c.json({ error: "parameter month wajib diisi (format: YYYY-MM)" }, 400);
+    }
+    
+    const start = new Date(`${month}-01T00:00:00.000Z`);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    
+    const data = await db
+      .select({
+        id: attendances.id,
+        user_id: attendances.user_id,
+        name: usersAbsensi.name,
+        email: usersAbsensi.email,
+        check_in: attendances.check_in,
+        check_out: attendances.check_out,
+        note: attendances.note,
+      })
+      .from(attendances)
+      .leftJoin(usersAbsensi, eq(attendances.user_id, usersAbsensi.id))
+      .where(and(gte(attendances.check_in, start), lte(attendances.check_in, end)))
+      .orderBy(attendances.check_in);
+    
+    // Buat Excel
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Data Users');
+    const worksheet = workbook.addWorksheet(`Absensi ${month}`);
     
+    // Definisikan kolom
     worksheet.columns = [
-      { header: 'ID', key: 'id', width: 10 },
-      { header: 'Nama', key: 'name', width: 25 },
-      { header: 'Email', key: 'email', width: 35 },
-      { header: 'Role', key: 'role', width: 15 },
-      { header: 'Status', key: 'status', width: 15 },
-      { header: 'Tanggal Dibuat', key: 'created_at', width: 20 },
+      { header: 'NO', key: 'no', width: 8 },
+      { header: 'NAMA', key: 'name', width: 25 },
+      { header: 'EMAIL', key: 'email', width: 30 },
+      { header: 'CHECK IN', key: 'check_in', width: 20 },
+      { header: 'CHECK OUT', key: 'check_out', width: 20 },
     ];
     
+    // Styling header
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF4F46E5' }
     };
+    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
     
-    data.forEach(user => {
+    let no = 1;
+    data.forEach(absensi => {
       worksheet.addRow({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.is_active ? 'Aktif' : 'Tidak Aktif',
-        created_at: user.created_at?.toLocaleDateString('id-ID')
+        no: no++,
+        name: absensi.name || '-',
+        email: absensi.email || '-',
+        check_in: absensi.check_in ? formatDateTime(absensi.check_in) : '-',
+        check_out: absensi.check_out ? formatDateTime(absensi.check_out) : '-',
+        note: absensi.note || '-',
+      });
+    });
+    
+    const totalRow = worksheet.addRow({
+      no: `TOTAL: ${data.length} Data`,
+      name: '',
+      email: '',
+      check_in: '',
+      check_out: ''
+    });
+    totalRow.getCell(6).font = { bold: true };
+    
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
       });
     });
     
     const buffer = await workbook.xlsx.writeBuffer();
     
+    // Set header response
     c.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    c.header('Content-Disposition', `attachment; filename="users_${Date.now()}.xlsx"`);
+    c.header('Content-Disposition', `attachment; filename="absensi_${month}_${Date.now()}.xlsx"`);
     
     return c.body(buffer);
   } catch (error) {
     console.error(error);
-    return c.json({ error: 'Gagal export Excel' }, 500);
+    return c.json({ error: 'Gagal export Excel absensi' }, 500);
   }
 });
+
+function formatDateTime(date) {
+  if (!date) return '-';
+  const d = new Date(date);
+  const tanggal = d.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  const waktu = d.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  return `${tanggal} ${waktu}`;
+}
 
 export default admin;

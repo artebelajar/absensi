@@ -64,6 +64,7 @@
     <table border="1" cellpading="6">
         <thead>
             <tr>
+                <th>Id</th>
                 <th>Nama</th>
                 <th>Email</th>
                 <th>Check In</th>
@@ -76,184 +77,290 @@
             </tr>
         </tbody>
     </table>
-    <button class="btn-excel" onclick="downloadExcel()">
+    <button class="btn-excel" onclick="downloadAbsensiExcel()">
         📥 Download Excel
     </button>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
-    <script>
-        let allUsers = []; 
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
-document.getElementById('filterMonth').value = `${yyyy}-${mm}`;
+<script>
+    let allUsers = [];
+    let currentAbsensiData = []; 
+    let currentMonth = ''; 
+    
+    // Set default month
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const monthInput = document.getElementById('filterMonth');
+    if (monthInput) {
+        monthInput.value = `${yyyy}-${mm}`;
+        currentMonth = `${yyyy}-${mm}`;
+    }
 
-(async () => {
-    const res = await fetch("/auth/me", {credentials: "include"});
-if(!res.ok) return window.location.href = "/login.html"
-const {user} = await res.json()
-console.log(user);
-document.getElementById("adminLabel").innerHTML = user.name;
-await loadUsers();
-await loadAbsensi();
-})();
+    // Initial load
+    (async () => {
+        const res = await fetch("/auth/me", {credentials: "include"});
+        if (!res.ok) return window.location.href = "/login.html";
+        const {user} = await res.json();
+        console.log(user);
+        const adminLabel = document.getElementById("adminLabel");
+        if (adminLabel) adminLabel.innerHTML = user.name;
+        await loadUsers();
+        await loadAbsensi();
+    })();
 
-async function loadUsers() {
-    const res = await fetch("/admin/users", {credentials: "include"});
-if(res.status === 401 || res.status === 403) {window.location.href = "/login.html"; return; }
-const {data} = await res.json();
-allUsers = data;
-const tbody = document.getElementById("userTableBody");
-if(!data || !data.length === 0){
-    tbody.innerHTML = `<tr><td colspan="4">Tidak ada data</td></tr>`;
-    return;
-}
-tbody.innerHTML = data.map(u => `
-    <tr>
-        <td>${u.name}</td>
-        <td>${u.email}</td>
-        <td>${u.role}</td>
-        <td>${u.is_active ? "Aktif" : "Tidak Aktif"}</td>
-    </tr>
-`).join("");
-}
-
-
-async function tambahUser(e) {
-    e.preventDefault();
-const body = {
-    name: document.getElementById("fieldName").value,
-    email: document.getElementById("fieldEmail").value,
-    password: document.getElementById("fieldPassword").value,
-    role: document.getElementById("fieldRole").value,
-};
-const res = await fetch("/admin/users", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    credentials: "include"
-});
-const data = await res.json();
-document.getElementById("formResult").textContent = data.message;
-
-if(res.ok) {
-    e.target.reset();
-await loadUsers();
-}
-}
-
-async function downloadExcel() {
-            if (allUsers.length === 0) {
-                showToast('Tidak ada data untuk diekspor', 'warning');
-                return;
-            }
-            
-            try {
-                // Langsung download dari backend
-                const response = await fetch(`admin/export/excel`);
-                const blob = await response.blob();
-                
-                // Create download link
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `users_${Date.now()}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                
-                showToast(`✅ Download Excel berhasil (${allUsers.length} data)`, 'success');
-            } catch (error) {
-                // Fallback: Export client-side jika backend error
-                exportToExcelClientSide(allUsers, 'all_users');
-            }
+    // Load Users
+    async function loadUsers() {
+        const res = await fetch("/admin/users", {credentials: "include"});
+        
+        if (res.status === 401 || res.status === 403) {
+            window.location.href = "/login.html"; 
+            return; 
         }
         
-
-        function exportToExcelClientSide(data, filename) {
-            const excelData = data.map(user => ({
-                'ID': user.id,
-                'Nama': user.name,
-                'Email': user.email,
-                'Role': user.role,
-                'Status': user.is_active ? 'Aktif' : 'Tidak Aktif',
-                'Tanggal Dibuat': user.created_at ? new Date(user.created_at).toLocaleDateString('id-ID') : '-'
-            }));
-            
-            const worksheet = XLSX.utils.json_to_sheet(excelData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Database Users');
-            
-            const maxWidth = Object.keys(excelData[0]).reduce((width, key) => {
-                const colWidth = Math.max(key.length, ...excelData.map(row => String(row[key]).length));
-                return { ...width, [key]: colWidth };
-            }, {});
-            worksheet['!cols'] = Object.values(maxWidth).map(w => ({ wch: Math.min(w + 2, 50) }));
-            
-            XLSX.writeFile(workbook, `${filename}_${Date.now()}.xlsx`);
+        const {data} = await res.json();
+        const tbody = document.getElementById("userTableBody");
+        
+        allUsers = data || [];
+        
+        if (!allUsers.length) {
+            tbody.innerHTML = `<tr><td colspan="4">Tidak ada数据</td>`;
+            return;
         }
         
-
-async function loadAbsensi() {
-    const month = document.getElementById("filterMonth").value;
-    if(!month){
-        document.getElementById('absensiResult').textContent = 'Tanggal tidak valid';
-        return;
-    }
-    const res = await fetch(`/admin/attendances?month=${month}`, {
-        credentials: "include",
-    });
-    const {data} = await res.json();
-    const tbody = document.getElementById("absensiTableBody");
-    document.getElementById('absensiResult').textContent = '';
-
-    if (!res.ok) {
-        document.getElementById('absensiResult').textContent = data.message;
-        tbody.innerHTML = `<tr><td colspan="4">Tidak ada data</td></tr>`;
-        return;
+        tbody.innerHTML = allUsers.map(u => `
+            <tr>
+                <td>${escapeHtml(u.name)}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${escapeHtml(u.role)}</td>
+                <td>${u.is_active ? "Aktif" : "Tidak Aktif"}</td>
+            </tr>
+        `).join("");
     }
 
-    if (!data || !data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4">Tidak ada data</td></tr>`;
-        return;
+    async function loadAbsensi() {
+        const monthInput = document.getElementById("filterMonth");
+        if (!monthInput) return;
+        
+        const month = monthInput.value;
+        if (!month) {
+            const absensiResult = document.getElementById('absensiResult');
+            if (absensiResult) absensiResult.textContent = 'Tanggal tidak valid';
+            return;
+        }
+        
+        currentMonth = month;
+        
+        const res = await fetch(`/admin/attendances?month=${month}`, {
+            credentials: "include",
+        });
+        const {data} = await res.json();
+        const tbody = document.getElementById("absensiTableBody");
+        const absensiResult = document.getElementById('absensiResult');
+        
+        if (absensiResult) absensiResult.textContent = '';
+
+        if (!res.ok) {
+            if (absensiResult) absensiResult.textContent = data?.message || 'Error load data';
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5">Tidak ada 数据</tr>`;
+            currentAbsensiData = [];
+            return;
+        }
+
+        currentAbsensiData = data || [];
+        
+        if (!currentAbsensiData.length) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5">Tidak ada data untuk bulan ${month}</table>`;
+            return;
+        }
+
+        if (tbody) {
+            tbody.innerHTML = currentAbsensiData.map((a, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(a.name ?? "-")}</td>
+                    <td>${escapeHtml(a.email ?? "-")}</td>
+                    <td>${formatTanggal(a.check_in)}</td>
+                    <td>${a.check_out ? formatTanggal(a.check_out) : "-"}</td>
+                </tr>
+            `).join("");
+        }
+        
+        if (absensiResult) {
+            absensiResult.textContent = `Menampilkan ${currentAbsensiData.length} data absensi untuk bulan ${month}`;
+        }
     }
 
-    tbody.innerHTML = data.map(a => `
-        <tr>
-            <td>${a.name ?? "-"}</td>
-            <td>${a.email ?? "-"}</td>
-            <td>${formatTanggal(a.check_in)}</td>
-            <td>${a.check_out ? formatTanggal(a.check_out) : "-"}</td>
-        </tr>
-    `).join("");
-}
-function formatTanggal(iso){
-    if(!iso) return "-";
-    const d = new Date(iso);
-    return d.toLocaleDateString("id-ID", {day: '2-digit', month: 'short', year: 'numeric'} + " " + d.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'}));
-   }
-
-   async function logout() {
-       const res = await fetch("/auth/logout", {
-           method: "POST",
-           credentials: "include",
-       });
-           window.location.href = "/login.html";
-   }
-
-   function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
+    async function downloadAbsensiExcel() {
+        if (!currentMonth) {
+            showToast('Pilih bulan terlebih dahulu', 'warning');
+            return;
+        }
+        
+        if (currentAbsensiData.length === 0) {
+            showToast(`Tidak ada data absensi untuk bulan ${currentMonth}`, 'warning');
+            return;
+        }
+        
+        showToast('⏳ Sedang men-generate file Excel...', 'info');
+        
+        try {
+            const response = await fetch(`/admin/export/absensi-excel?month=${currentMonth}`, {
+                credentials: "include"
             });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Export gagal');
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `absensi_${currentMonth}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showToast(`✅ Download Excel berhasil! (${currentAbsensiData.length} data)`, 'success');
+        } catch (error) {
+            console.error(error);
+            exportAbsensiToExcelClientSide(currentAbsensiData, currentMonth);
         }
-    </script>
+    }
+
+    function exportAbsensiToExcelClientSide(data, month) {
+        if (!data.length) {
+            showToast('Tidak ada data untuk diekspor', 'warning');
+            return;
+        }
+        
+        const excelData = data.map((item, index) => ({
+            'NO': index + 1,
+            'NAMA': item.name || '-',
+            'EMAIL': item.email || '-',
+            'CHECK IN': formatDateTimeForExcel(item.check_in),
+            'CHECK OUT': item.check_out ? formatDateTimeForExcel(item.check_out) : '-',
+        }));
+        
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Absensi ${month}`);
+        
+        const maxWidth = Object.keys(excelData[0]).reduce((width, key) => {
+            const colWidth = Math.max(key.length, ...excelData.map(row => String(row[key]).length));
+            return { ...width, [key]: colWidth };
+        }, {});
+        worksheet['!cols'] = Object.values(maxWidth).map(w => ({ wch: Math.min(w + 2, 50) }));
+        
+        XLSX.writeFile(workbook, `absensi_${month}_${Date.now()}.xlsx`);
+        showToast(`✅ Export ${data.length} data absensi berhasil!`, 'success');
+    }
+
+    function formatDateTimeForExcel(date) {
+        if (!date) return '-';
+        const d = new Date(date);
+        const tanggal = d.toLocaleDateString('id-ID');
+        const waktu = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return `${tanggal} ${waktu}`;
+    }
+
+    function formatTanggal(iso) {
+        if (!iso) return "-";
+        const d = new Date(iso);
+        const date = d.toLocaleDateString("id-ID", {day: '2-digit', month: 'short', year: 'numeric'});
+        const time = d.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'});
+        return `${date} ${time}`;
+    }
+
+    async function tambahUser(e) {
+        e.preventDefault();
+        const body = {
+            name: document.getElementById("fieldName").value,
+            email: document.getElementById("fieldEmail").value,
+            password: document.getElementById("fieldPassword").value,
+            role: document.getElementById("fieldRole").value,
+        };
+        const res = await fetch("/admin/users", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body),
+            credentials: "include"
+        });
+        const data = await res.json();
+        const formResult = document.getElementById("formResult");
+        if (formResult) formResult.textContent = data.message || data.error;
+
+        if (res.ok) {
+            e.target.reset();
+            await loadUsers();
+        }
+    }
+
+    // Logout
+    async function logout() {
+        await fetch("/auth/logout", {
+            method: "POST",
+            credentials: "include",
+        });
+        window.location.href = "/login.html";
+    }
+
+    // Escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, type = 'success') {
+        const oldToast = document.querySelector('.toast-notification');
+        if (oldToast) oldToast.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            font-size: 14px;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+</script>
 </body>
 </html>
