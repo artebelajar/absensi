@@ -1,54 +1,209 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Absensi</title>
-  </head>
-  <body>
-    <h2>Absensi</h2>
+    <title>Absensi - Abstract Art</title>
+    <!-- Import Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Unbounded:wght@300;400&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-red: #ff4d4d;
+            --dark-red: #8b0000;
+            --bg-black: #0a0a0a;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
 
-    <input type="text" id="identifier" placeholder="ID atau email" /><br /><br />
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-black);
+            font-family: 'Unbounded', sans-serif;
+            color: white;
+            overflow: hidden;
+            position: relative;
+        }
 
-    <button onclick="checkIn()">Check In</button>
-    <button onclick="checkOut()">Check Out</button>
+        /* Elemen Abstrak di Latar Belakang */
+        body::before {
+            content: "";
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--dark-red) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+            filter: blur(80px);
+            z-index: -1;
+            animation: pulse 10s infinite alternate;
+        }
 
-    <p id="result"></p>
+        body::after {
+            content: "";
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, #ff0000 0%, transparent 70%);
+            bottom: -50px;
+            left: -50px;
+            filter: blur(60px);
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); opacity: 0.5; }
+            to { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        /* Container Utama */
+        .container {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            position: relative;
+            z-index: 1;
+        }
+
+        h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3rem;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            letter-spacing: -2px;
+            background: linear-gradient(to bottom, #fff, var(--primary-red));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Styling Input */
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-bottom: 2px solid var(--dark-red);
+            color: white;
+            font-family: 'Unbounded', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            outline: none;
+            margin-bottom: 1.5rem;
+        }
+
+        input[type="text"]:focus {
+            background: rgba(255, 77, 77, 0.1);
+            border-bottom: 2px solid var(--primary-red);
+        }
+
+        /* Styling Button */
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        button:first-of-type { /* Check In */
+            background-color: var(--primary-red);
+            color: black;
+        }
+
+        button:nth-of-type(2) { /* Check Out */
+            background-color: transparent;
+            color: var(--primary-red);
+            border: 2px solid var(--primary-red);
+        }
+
+        button:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 10px 20px rgba(255, 77, 77, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Hasil */
+        #result {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            min-height: 1.2em;
+            color: #ccc;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Absensi</h2>
+
+        <input type="text" id="identifier" placeholder="ID ATAU EMAIL" />
+
+        <div class="btn-group">
+            <button onclick="checkIn()">Check In</button>
+            <button onclick="checkOut()">Check Out</button>
+        </div>
+
+        <p id="result"></p>
+    </div>
 
     <script>
-  async function checkIn() {
-    const identifier = document.getElementById("identifier").value;
-    console.log(identifier);
+        async function checkIn() {
+            const identifier = document.getElementById("identifier").value;
+            if(!identifier) return alert("Masukkan ID!");
 
-    const res = await fetch("/user/check-in", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifier }),
-    });
+            const res = await fetch("/user/check-in", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ identifier }),
+            });
 
-    const result = await res.json();
-    document.getElementById("result").innerText = result.message;
-  }
+            const result = await res.json();
+            document.getElementById("result").innerText = result.message;
+        }
 
-  async function checkOut() {
-    const identifier = document.getElementById("identifier").value;
+        async function checkOut() {
+            const identifier = document.getElementById("identifier").value;
+            if(!identifier) return alert("Masukkan ID!");
 
-    const res = await fetch("/user/check-out", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifier }),
-    });
+            const res = await fetch("/user/check-out", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ identifier }),
+            });
 
-    const result = await res.json();
-    console.log(result);
-    document.getElementById("result").innerText = result.message || result.error;
-    ;
-  }
+            const result = await res.json();
+            document.getElementById("result").innerText = result.message || result.error;
+        }
 
-      (async () => {
-        const res = await fetch("/auth/me", { credentials: "include" });
-        if (!res.ok) return (window.location.href = "/login.html");
-      })();
-</script>
-  </body>
+        (async () => {
+            const res = await fetch("/auth/me", { credentials: "include" });
+            if (!res.ok) return (window.location.href = "/login.html");
+        })();
+    </script>
+</body>
 </html>
